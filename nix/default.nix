@@ -171,7 +171,10 @@ let
         Operation = Remove
         Type = Path
         Target = usr/share/nix-profile.d/*.json
-        Target = usr/lib/pacman-impurifier/engine.py
+        Target = usr/lib/*
+        Target = usr/lib64/*
+        Target = lib/*
+        Target = lib64/*
         [Action]
         Description = Reconcile Nix application profile
         When = PostTransaction

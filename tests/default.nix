@@ -1,5 +1,9 @@
 # SPDX-License-Identifier: MIT
-{ pkgs, impurifier }:
+{
+  pkgs,
+  impurifier,
+  coreSrc,
+}:
 let
   net = impurifier.makeNetPackage { pkg = pkgs.hello; };
   offline = impurifier.makeOfflinePackage { pkg = pkgs.hello; };
@@ -28,5 +32,8 @@ in
         test "$(wc -l < ${closure}/store-paths)" = 2
         touch $out
       '';
-  vm = import ./vm.nix { inherit pkgs impurifier; };
+  vm = import ./vm.nix {
+    inherit pkgs impurifier;
+    hardwareFixture = import (coreSrc + "/tests/hardware-fixture.nix") { inherit pkgs; };
+  };
 }

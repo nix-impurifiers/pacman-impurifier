@@ -1,5 +1,9 @@
 # SPDX-License-Identifier: MIT
-{ pkgs, impurifier }:
+{
+  pkgs,
+  impurifier,
+  hardwareFixture,
+}:
 let
   tool =
     version:
@@ -70,6 +74,18 @@ let
         WantedBy=multi-user.target
       '';
     };
+  hostDriver =
+    version:
+    impurifier.buildPackage {
+      name = "impurifier-host-driver";
+      architecture = "x86_64";
+      inherit version;
+      payload = hardwareFixture.driver version;
+    };
+  hardwareApp = impurifier.makeOfflinePackage {
+    pkg = hardwareFixture.tool;
+    inherit (hardwareFixture) hardware;
+  };
   provider = impurifier.buildPackage {
     name = "vm-runtime";
     version = "1";
@@ -128,6 +144,7 @@ pkgs.testers.runNixOSTest {
     machine.succeed("cp ${app false "1"} /tmp/packages/net1.pkg.tar.zst; cp ${app true "1"} /tmp/packages/offline1.pkg.tar.zst; cp ${app true "2"} /tmp/packages/offline2.pkg.tar.zst; cp ${integration "1"} /tmp/packages/integration1.pkg.tar.zst; cp ${integration "2"} /tmp/packages/integration2.pkg.tar.zst")
     machine.succeed("cp -rL /etc/systemd/system /tmp/systemd-system; chmod -R u+w /tmp/systemd-system; rm /etc/systemd/system; mv /tmp/systemd-system /etc/systemd/system; systemctl daemon-reload")
     machine.succeed("cp ${(service "1").offline} /tmp/packages/service1.pkg.tar.zst; cp ${(service "1").integration} /tmp/packages/service-integration1.pkg.tar.zst; cp ${(service "2").offline} /tmp/packages/service2.pkg.tar.zst; cp ${(service "2").integration} /tmp/packages/service-integration2.pkg.tar.zst")
+    machine.succeed("cp ${hostDriver "1"} /tmp/packages/driver1.pkg.tar.zst; cp ${hostDriver "2"} /tmp/packages/driver2.pkg.tar.zst; cp ${hardwareApp} /tmp/packages/hardware.pkg.tar.zst")
     machine.succeed("systemctl stop dhcpcd; ip link set eth0 down")
     pacman = "pacman --config /etc/pacman.conf "
     machine.succeed(pacman + "-U --noconfirm ${provider} ${impurifier.runtimePackage}")
@@ -179,6 +196,14 @@ pkgs.testers.runNixOSTest {
         machine.succeed("systemctl enable --now alpm-service.service")
         machine.succeed(pacman + "-R --noconfirm alpm-service-offline alpm-service-integration")
         machine.fail("systemctl is-active --quiet alpm-service.service")
+    with subtest("native library upgrades refresh the hardware snapshot"):
+        machine.succeed(pacman + "-U --noconfirm /tmp/packages/driver1.pkg.tar.zst /tmp/packages/hardware.pkg.tar.zst")
+        machine.succeed("/opt/nix/profile/bin/hardware-tool | grep '^1$'")
+        before = machine.succeed("readlink /opt/nix/profile").strip()
+        machine.succeed(pacman + "-U --noconfirm /tmp/packages/driver2.pkg.tar.zst")
+        assert machine.succeed("readlink /opt/nix/profile").strip() != before
+        machine.succeed("/opt/nix/profile/bin/hardware-tool | grep '^2$'")
+        machine.succeed(pacman + "-R --noconfirm hardware-tool-offline impurifier-host-driver")
     with subtest("GC roots, native removal and generation pruning"):
         machine.succeed("nix-store --gc; test $(/opt/nix/profile/bin/alpm-tool) = 2")
         machine.succeed(pacman + "-R --noconfirm alpm-tool-offline alpm-tool-integration")
