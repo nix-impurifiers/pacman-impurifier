@@ -1,11 +1,20 @@
 # SPDX-License-Identifier: MIT
-{ pkgs, coreSrc }:
+{
+  pkgs,
+  coreSrc,
+  sourceInfo ? { },
+}:
 let
   inherit (pkgs) lib;
   core = import (coreSrc + "/nix") {
     inherit pkgs;
     namespace = "pacman-impurifier";
-    sourceInfo = coreSrc;
+    sourceInfo = {
+      # Native updates must include adapter-only releases, not just engine pins.
+      lastModified = pkgs.lib.max (if builtins.isAttrs coreSrc then coreSrc.lastModified or 0 else 0) (
+        if builtins.isAttrs sourceInfo then sourceInfo.lastModified or 0 else 0
+      );
+    };
   };
   architecture =
     if pkgs.stdenv.hostPlatform.isx86_64 then
@@ -145,7 +154,9 @@ let
         "pacman-impurifier>=${core.runtimeVersion}"
       ]
       ++ lib.optional (hasIntegration args) "${payload.name}-integration=${payload.version}-${release}"
-      ++ lib.optionals (!(hasIntegration args) && (args.hostDependencies or null) != null) hostDependencies;
+      ++ lib.optionals (
+        !(hasIntegration args) && (args.hostDependencies or null) != null
+      ) hostDependencies;
       provides = [ "${payload.name}=${payload.version}" ];
       conflicts = [ "${payload.name}-${if payload.offline then "net" else "offline"}" ];
       replaces = [ "${payload.name}-${if payload.offline then "net" else "offline"}" ];
