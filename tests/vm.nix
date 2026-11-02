@@ -51,6 +51,16 @@ let
         owner = "alpm-service:alpm-service";
         mode = "0750";
       };
+      lifecycle = {
+        onInstall = ''
+          /usr/bin/python3 -c "import pwd; pwd.getpwnam('alpm-service')"
+          test -x /opt/nix/profile/bin/alpm-service
+          echo initialized > /var/lib/alpm-service/initialized
+        '';
+        onUpgrade = ''
+          echo ${version} > /var/lib/alpm-service/migrated
+        '';
+      };
       systemd.unit = pkgs.writeText "alpm-service.service" ''
         [Service]
         Type=exec
@@ -161,6 +171,7 @@ pkgs.testers.runNixOSTest {
         machine.succeed("id alpm-service; test $(stat -c %U /var/lib/alpm-service) = alpm-service")
         machine.succeed(pacman + "-U --noconfirm /tmp/packages/service2.pkg.tar.zst /tmp/packages/service-integration2.pkg.tar.zst")
         machine.wait_until_succeeds("grep '^2$' /var/lib/alpm-service/version")
+        machine.succeed("grep initialized /var/lib/alpm-service/initialized; grep '^2$' /var/lib/alpm-service/migrated")
         machine.succeed("systemctl disable --now alpm-service.service")
         machine.succeed(pacman + "-U --noconfirm /tmp/packages/service1.pkg.tar.zst /tmp/packages/service-integration1.pkg.tar.zst")
         machine.fail("systemctl is-active --quiet alpm-service.service")

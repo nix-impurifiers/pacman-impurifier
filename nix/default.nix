@@ -83,7 +83,8 @@ let
     || (args.users or { }) != { }
     || (args.directories or { }) != { }
     || (args.systemd or null) != null
-    || (args.openrc or null) != null;
+    || (args.openrc or null) != null
+    || (args.lifecycle or { }) != { };
   makeIntegrationPackage =
     args@{
       pkg,
