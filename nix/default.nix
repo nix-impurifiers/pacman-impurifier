@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 { pkgs, coreSrc }:
 let
   inherit (pkgs) lib;
@@ -155,7 +155,7 @@ let
     buildPackage {
       name = "pacman-impurifier";
       version = "0.1.0";
-      license = "GPL-3.0-or-later";
+      license = "MIT";
       description = "Native package intent projected into a Nix profile";
       dependencies = [
         nixDependency
