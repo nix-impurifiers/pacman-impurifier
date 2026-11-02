@@ -83,6 +83,7 @@ let
       payload = hardwareFixture.driver version;
     };
   hardwareApp = impurifier.makeOfflinePackage {
+    hostDependencies = [ "impurifier-host-driver" ];
     pkg = hardwareFixture.tool;
     inherit (hardwareFixture) hardware;
   };
@@ -197,6 +198,8 @@ pkgs.testers.runNixOSTest {
         machine.succeed(pacman + "-R --noconfirm alpm-service-offline alpm-service-integration")
         machine.fail("systemctl is-active --quiet alpm-service.service")
     with subtest("native library upgrades refresh the hardware snapshot"):
+        code, output = machine.execute(pacman + "-U --noconfirm /tmp/packages/hardware.pkg.tar.zst 2>&1")
+        assert code != 0 and "impurifier-host-driver" in output, output
         machine.succeed(pacman + "-U --noconfirm /tmp/packages/driver1.pkg.tar.zst /tmp/packages/hardware.pkg.tar.zst")
         machine.succeed("/opt/nix/profile/bin/hardware-tool | grep '^1$'")
         before = machine.succeed("readlink /opt/nix/profile").strip()

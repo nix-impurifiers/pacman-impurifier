@@ -5,6 +5,7 @@ let
   core = import (coreSrc + "/nix") {
     inherit pkgs;
     namespace = "pacman-impurifier";
+    sourceInfo = coreSrc;
   };
   architecture =
     if pkgs.stdenv.hostPlatform.isx86_64 then
@@ -112,7 +113,10 @@ let
         name = "${payload.name}-integration";
         inherit (payload) version description;
         inherit payload release architecture;
-        dependencies = [ "pacman-impurifier>=0.1.0" ] ++ lib.optionals payload.hostEnabled hostDependencies;
+        dependencies = [
+          "pacman-impurifier>=${core.runtimeVersion}"
+        ]
+        ++ lib.optionals (payload.hostEnabled || (args.hostDependencies or null) != null) hostDependencies;
         backupPaths = payload.configPaths;
       };
   makePacmanPackage =
@@ -138,9 +142,10 @@ let
       inherit (payload) version description;
       inherit payload release architecture;
       dependencies = [
-        "pacman-impurifier>=0.1.0"
+        "pacman-impurifier>=${core.runtimeVersion}"
       ]
-      ++ lib.optional (hasIntegration args) "${payload.name}-integration=${payload.version}-${release}";
+      ++ lib.optional (hasIntegration args) "${payload.name}-integration=${payload.version}-${release}"
+      ++ lib.optionals (!(hasIntegration args) && (args.hostDependencies or null) != null) hostDependencies;
       provides = [ "${payload.name}=${payload.version}" ];
       conflicts = [ "${payload.name}-${if payload.offline then "net" else "offline"}" ];
       replaces = [ "${payload.name}-${if payload.offline then "net" else "offline"}" ];
@@ -155,7 +160,7 @@ let
     in
     buildPackage {
       name = "pacman-impurifier";
-      version = "0.1.0";
+      version = core.runtimeVersion;
       license = "MIT";
       description = "Native package intent projected into a Nix profile";
       dependencies = [
@@ -185,7 +190,12 @@ let
     };
 in
 {
-  inherit (core) engine offlineCache unit;
+  inherit (core)
+    engine
+    offlineCache
+    unit
+    runtimeVersion
+    ;
   inherit
     buildPackage
     makePacmanPackage
