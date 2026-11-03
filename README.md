@@ -46,3 +46,17 @@ The engine captures explicitly selected ELF files into an immutable Nix-store di
 Consumers select compatible libraries, their non-Nix dependencies, paths and native package dependencies. This does not discover a GPU stack, validate its ABI, rebind already-running processes, or roll back kernel modules. GPU user/kernel compatibility and real-device behavior need hardware tests. Sources outside `/usr/lib`, `/usr/lib64`, `/lib` and `/lib64` need explicit reconciliation after updates. This is a bounded runtime bridge, not automatic GPU compatibility.
 
 The exported `runtimeVersion` follows the pinned core source timestamp. Application dependencies require that runtime version or newer, rather than accepting every engine as `0.1.0`. This supports ordinary native engine upgrades without project release tags. Consumer-provided Nix dependency expressions remain independent of the engine's own native version.
+
+`makePkgbuild { package = impurifier.makeOfflinePackage { pkg = pkgs.hello; }; }`
+emits a native `PKGBUILD` and its source artifact. Build it as an ordinary user
+with `makepkg -i`, or commit the directory to a local Git repository and use
+Yay/Paru's `-Bi` operation or Pikaur's `-Pi` operation. The recipe preserves native dependencies, conflicts,
+backup paths and licenses, verifies the artifact SHA256, and disables makepkg's
+payload rewriting. A `sourceUrl` HTTP(S) override emits a recipe referencing a
+published artifact instead of including a local copy. Publishing that artifact
+and submitting a package to the AUR remain publisher actions; this factory does
+not submit anything. Native `.INSTALL` scriptlets are preserved as makepkg install scripts.
+
+A signed-repository VM and native helper VMs cover makepkg, Yay, Paru, Pikaur,
+Aura, Pacaur, Trizen and Pamac CLI. See [testing](docs/development/testing.md)
+for tested paths and remaining compatibility coverage.

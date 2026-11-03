@@ -38,6 +38,7 @@ let
       conflicts ? [ ],
       replaces ? [ ],
       backupPaths ? [ ],
+      installScript ? null,
     }:
     assert lib.assertMsg (builtins.match "[a-z0-9][a-z0-9+.-]+" name != null) "invalid ALPM name";
     assert lib.assertMsg (
@@ -60,6 +61,7 @@ let
         mkdir root
         cp -r ${payload}/. root/
         chmod -R u+w root
+        ${lib.optionalString (installScript != null) "cp ${installScript} root/.INSTALL"}
         cat > root/.PKGINFO <<'PKGINFO'
         pkgname = ${name}
         pkgbase = ${name}
@@ -77,9 +79,10 @@ let
         ${lib.concatMapStringsSep "\n" (value: "replaces = ${value}") replaces}
         ${lib.concatMapStringsSep "\n" (path: "backup = ${lib.removePrefix "/" path}") backupPaths}
         PKGINFO
+        sed -i '/^$/d' root/.PKGINFO
         echo "size = $(du --apparent-size -sb root | cut -f1)" >> root/.PKGINFO
         find root -exec touch -h -d @1 {} +
-        bsdtar --format=mtree --options='!all,use-set,type,uid,gid,mode,time,size,sha256,link' \
+        bsdtar --uid 0 --gid 0 --format=mtree --options='!all,use-set,type,uid,gid,mode,time,size,sha256,link' \
           -czf "$TMPDIR/mtree.gz" -C root .
         cp "$TMPDIR/mtree.gz" root/.MTREE
         find root -mindepth 1 -printf '%P\0' | sort -z > files
@@ -161,6 +164,34 @@ let
       conflicts = [ "${payload.name}-${if payload.offline then "net" else "offline"}" ];
       replaces = [ "${payload.name}-${if payload.offline then "net" else "offline"}" ];
     };
+  # Emit a native recipe; a remote source URL can reference a published artifact.
+  makePkgbuild =
+    {
+      package,
+      sourceUrl ? null,
+    }:
+    assert lib.assertMsg (
+      sourceUrl == null
+      || (
+        builtins.isString sourceUrl
+        && (lib.hasPrefix "https://" sourceUrl || lib.hasPrefix "http://" sourceUrl)
+        && !(lib.hasInfix "\n" sourceUrl)
+        && !(lib.hasInfix "\r" sourceUrl)
+      )
+    ) "sourceUrl must be an HTTP(S) artifact URL";
+    pkgs.runCommand "impurifier-pkgbuild"
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.libarchive
+        ];
+        __structuredAttrs = true;
+        unsafeDiscardReferences.out = true;
+        config = pkgs.writeText "pkgbuild-options.json" (builtins.toJSON { inherit sourceUrl; });
+      }
+      ''
+        python3 ${./pkgbuild.py} ${package} "$config" "$out"
+      '';
   makeRuntimePackage =
     {
       nixDependency ? "nix",
@@ -174,6 +205,12 @@ let
       version = core.runtimeVersion;
       license = "MIT";
       description = "Native package intent projected into a Nix profile";
+      installScript = pkgs.writeText "pacman-impurifier.install" ''
+        pre_remove() {
+          /usr/bin/nix-profile-engine reconcile || return
+          /usr/bin/nix-profile-engine prune --keep 0
+        }
+      '';
       dependencies = [
         nixDependency
         pythonDependency
@@ -209,6 +246,7 @@ in
     ;
   inherit
     buildPackage
+    makePkgbuild
     makePacmanPackage
     makeIntegrationPackage
     makeRuntimePackage

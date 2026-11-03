@@ -16,6 +16,37 @@ let
 in
 {
   unit = impurifier.unit;
+  pamac-vm = import ./pkgbuild-vm.nix {
+    inherit pkgs impurifier;
+    frontend = "pamac";
+  };
+  aura-vm = import ./pkgbuild-vm.nix {
+    inherit pkgs impurifier;
+    frontend = "aura";
+  };
+  pacaur-vm = import ./pkgbuild-vm.nix {
+    inherit pkgs impurifier;
+    frontend = "pacaur";
+  };
+  trizen-vm = import ./pkgbuild-vm.nix {
+    inherit pkgs impurifier;
+    frontend = "trizen";
+  };
+  pikaur-vm = import ./pkgbuild-vm.nix {
+    inherit pkgs impurifier;
+    frontend = "pikaur";
+  };
+  repository-vm = import ./repository-vm.nix { inherit pkgs impurifier; };
+  pkgbuild = import ./pkgbuild.nix { inherit pkgs impurifier; };
+  makepkg-vm = import ./pkgbuild-vm.nix { inherit pkgs impurifier; };
+  yay-vm = import ./pkgbuild-vm.nix {
+    inherit pkgs impurifier;
+    frontend = "yay";
+  };
+  paru-vm = import ./pkgbuild-vm.nix {
+    inherit pkgs impurifier;
+    frontend = "paru";
+  };
   emitter =
     pkgs.runCommand "pacman-impurifier-contract"
       {
