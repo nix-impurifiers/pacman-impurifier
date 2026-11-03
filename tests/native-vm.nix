@@ -40,5 +40,8 @@ import (coreSrc + "/tests/native-vm.nix") {
     test -z "$orphans" || ${command} -Rns $orphans
   '';
   removeSecond = "${command} -Rns native-second";
-  verify = "${command} -Qkk";
+  verify = ''
+    ${command} -Qkk > /tmp/native-alpm-verify.log 2>&1
+    ! grep -E 'warning:|[1-9][0-9]* altered files' /tmp/native-alpm-verify.log
+  '';
 }
