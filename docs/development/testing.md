@@ -29,3 +29,11 @@ Perl dependencies; Pacaur receives the native makepkg library path. Pamac uses
 the native library and CLI with AppStream disabled. Remote AUR submission,
 discovery and dependency fetching, Pamac GTK/polkit GUI interactions, and a full
 Arch/Manjaro installation remain additional coverage.
+
+
+`native-vm` exercises ordinary native packages in an isolated target root,
+including a shared runtime dependency and final native cleanup. It mounts no
+Nix store into the target and verifies no Nix executable/database/socket exists.
+`bundled-vm` repeats the service/recovery suite with an actual static Nix client
+and no external client on the engine PATH. It verifies packaging/client use,
+not installing a new daemon. See README for native ownership and cleanup policy.

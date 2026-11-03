@@ -3,6 +3,7 @@
   pkgs,
   impurifier,
   hardwareFixture,
+  bundled ? false,
 }:
 let
   tool =
@@ -124,8 +125,8 @@ pkgs.testers.runNixOSTest {
       "L+ /usr/bin/systemctl - - - - ${pkgs.systemd}/bin/systemctl"
       "L+ /usr/bin/systemd-sysusers - - - - ${pkgs.systemd}/bin/systemd-sysusers"
       "L+ /usr/bin/systemd-tmpfiles - - - - ${pkgs.systemd}/bin/systemd-tmpfiles"
-      "L+ /usr/bin/nix-store - - - - ${pkgs.nix}/bin/nix-store"
-    ];
+    ]
+    ++ pkgs.lib.optional (!bundled) "L+ /usr/bin/nix-store - - - - ${pkgs.nix}/bin/nix-store";
     environment.etc."pacman.conf".text = ''
       [options]
       Architecture = auto
@@ -149,6 +150,7 @@ pkgs.testers.runNixOSTest {
     machine.succeed("systemctl stop dhcpcd; ip link set eth0 down")
     pacman = "pacman --config /etc/pacman.conf "
     machine.succeed(pacman + "-U --noconfirm ${provider} ${impurifier.runtimePackage}")
+    ${pkgs.lib.optionalString bundled ''machine.succeed("test ! -e /usr/bin/nix-store && test ! -e /nix/var/nix/profiles/default/bin/nix-store && /usr/lib/pacman-impurifier/nix-store --version")''}
     machine.fail("test -e ${builtins.unsafeDiscardStringContext (toString (tool "1"))}")
     with subtest("failed post-transaction substitution preserves the old profile"):
         before = machine.succeed("readlink /opt/nix/profile").strip()

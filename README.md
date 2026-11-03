@@ -60,3 +60,40 @@ not submit anything. Native `.INSTALL` scriptlets are preserved as makepkg insta
 A signed-repository VM and native helper VMs cover makepkg, Yay, Paru, Pikaur,
 Aura, Pacaur, Trizen and Pamac CLI. See [testing](docs/development/testing.md)
 for tested paths and remaining compatibility coverage.
+
+
+## Native-owned closures and optional bundled Nix
+
+`makeNativePackages { pkg = myApplication; programs = [ "my-command" ]; }` returns
+a directory of native packages: one application package exporting commands, and
+one package per immutable runtime store object. Exact native dependencies retain
+shared objects. Native tools own the files and package database. The target needs
+no Nix executable, daemon, SQLite database, realization hooks or shared profile.
+Files remain at their original absolute paths; no relocation is performed.
+Inputs may come from any compatible Nix producer. This API currently covers
+payload files and command exports rather than the profile-mode host lifecycle DSL.
+
+Install the collection with ordinary native tools, or publish its artifacts in
+a native repository. Local-file installation may mark supplied dependency
+packages explicit; native dependency marks and cleanup policy remain the caller's
+choice. Upgrades can leave old immutable objects orphaned, so include native
+orphan cleanup when desired. Do not register these same paths into a Nix-managed
+store: Nix GC and native ownership must not overlap.
+
+`makeRuntimePackage` additionally accepts `bundledNixStore` (a supplied static ELF
+`nix-store` executable) and nonempty `bundledNixNotices`. A bundle makes the
+external native Nix dependency optional and marks the runtime package with its
+actual target architecture. A compatible external client is preferred; otherwise
+the private bundled client is used. Explicit `nixDependency` still requests a
+native provider. Client selection never changes store ownership or trust, and a
+failed mutation is not retried with another client. This is not daemon setup.
+
+`native-vm` tests isolated target-root installation, execution, upgrades, shared
+references, checksum verification and final cleanup without target-side Nix.
+`bundled-vm` reruns native lifecycle and recovery tests without an external client
+on the engine's discovery paths, using the actual static client. Those lifecycle
+fixtures still supply an existing Nix store; database-free operation is established
+by the separate native-owned test, not by the bundled client.
+
+For local ALPM archives, mark store-object packages as dependencies if desired.
+Use native recursive removal and orphan queries to clean objects left by upgrades.

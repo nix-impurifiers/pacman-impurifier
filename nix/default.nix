@@ -89,6 +89,22 @@ let
         tar -C root --null --no-recursion --mtime=@1 --owner=0 --group=0 --numeric-owner \
           --zstd -cf "$out" -T "$PWD/files"
       '';
+  makeNativePackages =
+    args:
+    let
+      trees = core.makeNativeTrees args;
+    in
+    pkgs.runCommand "native-owned-alpm-collection"
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.libarchive
+          pkgs.zstd
+        ];
+      }
+      ''
+        python3 ${./native-packages.py} ${trees} "$out" ${architecture}
+      '';
   hasIntegration =
     args:
     (args.configFiles or { }) != { }
@@ -194,14 +210,20 @@ let
       '';
   makeRuntimePackage =
     {
-      nixDependency ? "nix",
+      bundledNixStore ? null,
+      bundledNixNotices ? [ ],
+      nixDependency ? (if bundledNixStore == null then "nix" else null),
       pythonDependency ? "python",
     }:
     let
-      tree = core.makeRuntimeTree { binDir = "/usr/bin"; };
+      tree = core.makeRuntimeTree {
+        binDir = "/usr/bin";
+        inherit bundledNixStore bundledNixNotices;
+      };
     in
     buildPackage {
       name = "pacman-impurifier";
+      architecture = if bundledNixStore == null then "any" else architecture;
       version = core.runtimeVersion;
       license = "MIT";
       description = "Native package intent projected into a Nix profile";
@@ -211,10 +233,7 @@ let
           /usr/bin/nix-profile-engine prune --keep 0
         }
       '';
-      dependencies = [
-        nixDependency
-        pythonDependency
-      ];
+      dependencies = [ pythonDependency ] ++ lib.optional (nixDependency != null) nixDependency;
       payload = pkgs.runCommand "pacman-impurifier-runtime-payload" { } ''
         mkdir -p $out/usr/share/libalpm/hooks
         cp -r ${tree}/. $out/
@@ -250,6 +269,7 @@ in
     makePacmanPackage
     makeIntegrationPackage
     makeRuntimePackage
+    makeNativePackages
     ;
   runtimePackage = makeRuntimePackage { };
   makePackage = args: {
